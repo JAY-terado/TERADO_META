@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <clipPath id="logo-clip">
+      <rect width="400" height="400" rx="40" />
+    </clipPath>
+  </defs>
+  <g clip-path="url(#logo-clip)">
+    <!-- Base Background: White -->
+    <rect width="400" height="400" fill="#FFFFFF" />
+
+    <!-- Top Left Blue Region -->
+    <polygon points="0,0 178,0 178,162 0,0" fill="#1062AC" />
+
+    <!-- Top Center Blue Region -->
+    <polygon points="214,0 376,0 214,162" fill="#1062AC" />
+
+    <!-- Right Blue Quadrant -->
+    <polygon points="400,24 400,400 232,400 400,232" fill="#1062AC" />
+    <polygon points="400,0 400,24 232,192 214,174" fill="#1062AC" />
+    <polygon points="214,240 214,400 370,400" fill="#1062AC" />
+
+    <!-- Bottom Left Red Block -->
+    <polygon points="0,30 180,210 180,400 0,400" fill="#EC3237" />
+
+    <!-- High fidelity rendered overlay -->
+    <image href="/logo-mark.png" x="0" y="0" width="400" height="400" preserveAspectRatio="none" />
+  </g>
+</svg>

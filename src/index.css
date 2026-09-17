@@ -1,0 +1,316 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+@source "../node_modules/rizzui/dist";
+
+@theme {
+  --color-border: #cbd5e1; /* slate-300 */
+  --color-muted: #f8fafc;  /* slate-50 */
+  --color-primary: #1062ac; /* logo royal cobalt blue */
+  --color-brand-blue: #1062ac;
+  --color-brand-red: #ec3237;
+  
+  /* Brand-specific royal cobalt blue scale matching the new logo */
+  --color-blue-50: #f0f7ff;
+  --color-blue-100: #e0efff;
+  --color-blue-200: #bae0fd;
+  --color-blue-300: #7cc5fb;
+  --color-blue-400: #38a3f8;
+  --color-blue-500: #187bd1;
+  --color-blue-600: #1062ac;
+  --color-blue-700: #0d4e8c;
+  --color-blue-800: #0e4375;
+  --color-blue-900: #113962;
+  --color-blue-950: #09223d;
+
+  /* Brand red scale matching logo red quadrant */
+  --color-red-500: #ec3237;
+  --color-red-600: #dc2626;
+  --color-red-700: #b91c1c;
+}
+
+:root {
+  --border-radius: 12px;
+  --border-width: 1px;
+
+  /* Brand Palette from New Logo */
+  --brand-navy: #0B1528;
+  --brand-navy-mid: #0E1F38;
+  --brand-blue: #1062AC;
+  --brand-blue-light: #38A3F8;
+  --brand-red: #EC3237;
+  --brand-accent: #1062AC;
+
+  /* Surfaces */
+  --surface-0: #FFFFFF;
+  --surface-1: #F8FAFC;
+  --surface-2: #F1F5F9;
+  --surface-border: #E2E8F0;
+  --surface-border-subtle: #F1F5F9;
+
+  /* Text */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+  --text-inverse: #FFFFFF;
+
+  /* Semantic */
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EC3237;
+  --info: #1062AC;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(15,23,42,0.06), 0 4px 16px rgba(15,23,42,0.04);
+  --shadow-elevated: 0 4px 24px rgba(16,98,172,0.08), 0 1px 4px rgba(15,23,42,0.05);
+  --shadow-brand: 0 8px 24px rgba(16,98,172,0.22);
+  --shadow-accent: 0 8px 24px rgba(236,50,55,0.18);
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+}
+
+/* ─── Animation Keyframes ─────────────────────────────────── */
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16,98,172,0); }
+  50%       { box-shadow: 0 0 0 6px rgba(16,98,172,0.15); }
+}
+
+@keyframes numberTick {
+  from { opacity: 0; transform: translateY(8px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes progressFill {
+  from { width: 0%; }
+  to   { width: var(--target-width); }
+}
+
+@keyframes borderPulse {
+  0%, 100% { border-color: rgba(16,98,172,0.25); }
+  50%       { border-color: rgba(16,98,172,0.6); }
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-6px); }
+}
+
+@keyframes orb {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(20px, -15px) scale(1.04); }
+  66%  { transform: translate(-10px, 10px) scale(0.97); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes slideUpNav {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes shimmerSweep {
+  from { transform: translateX(-100%) skewX(-12deg); }
+  to   { transform: translateX(200%) skewX(-12deg); }
+}
+
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes dynamicGlow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(16, 98, 172, 0.45), 0 0 24px rgba(37, 99, 235, 0.25);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(16, 98, 172, 0.8), 0 0 38px rgba(59, 130, 246, 0.5), 0 0 50px rgba(99, 102, 241, 0.35);
+    transform: translateY(-1px);
+  }
+}
+
+.anim-glow-pulse {
+  animation: dynamicGlow 2.2s ease-in-out infinite;
+  will-change: transform, box-shadow;
+}
+
+.anim-fade-up       { animation: fadeUp 0.35s ease both; }
+.anim-fade-in       { animation: fadeIn 0.25s ease both; }
+.anim-scale-in      { animation: scaleIn 0.28s cubic-bezier(0.16,1,0.3,1) both; }
+.anim-slide-right   { animation: slideInRight 0.3s ease both; }
+.anim-slide-left    { animation: slideInLeft 0.3s ease both; }
+.anim-number        { animation: numberTick 0.4s cubic-bezier(0.16,1,0.3,1) both; }
+.anim-float         { animation: floatSlow 4s ease-in-out infinite; }
+
+/* Staggered children delays */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.30s; }
+
+/* Floating orb for login left panel */
+.anim-orb {
+  animation: orb 12s ease-in-out infinite;
+  will-change: transform;
+}
+.anim-orb-slow {
+  animation: orb 18s ease-in-out infinite reverse;
+  will-change: transform;
+}
+
+/* Shimmer for skeleton/loading states */
+.shimmer {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% auto;
+  animation: shimmer 1.5s linear infinite;
+}
+
+/* Pulse glow on active CTA */
+.pulse-glow { animation: pulseGlow 2.5s ease-in-out infinite; }
+
+/* Progress bar fill animation */
+.progress-fill {
+  animation: progressFill 0.8s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+/* Smooth transition default — apply to all interactive elements */
+.smooth { transition: all 0.18s cubic-bezier(0.16,1,0.3,1); }
+
+/* Card hover lift */
+.card-hover {
+  transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), 
+              box-shadow 0.2s cubic-bezier(0.16,1,0.3,1),
+              border-color 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(15,23,42,0.10);
+}
+
+/* Underline slide animation for links */
+.link-underline {
+  position: relative;
+}
+.link-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 0;
+  height: 1.5px;
+  background: currentColor;
+  transition: width 0.22s ease;
+}
+.link-underline:hover::after { width: 100%; }
+
+/* Active press scale */
+.press:active { transform: scale(0.97); }
+
+body {
+  font-family: 'Plus Jakarta Sans', 'DM Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--text-primary);
+  background: var(--surface-1);
+}
+
+/* Premium scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* Hide scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Smooth focus rings & minimal input focus */
+*:focus-visible {
+  outline: 1px solid var(--brand-blue-light, #3b82f6);
+  outline-offset: 1px;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #3b82f6 !important;
+  --tw-ring-width: 0px !important;
+  --tw-ring-offset-width: 0px !important;
+  --tw-ring-color: transparent !important;
+}
+
+/* iPhone notch / home indicator safe area */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* border-white/8 utility — semi-transparent white border */
+.border-white\/8 {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Lower placeholder opacity globally */
+input::placeholder, textarea::placeholder {
+  opacity: 0.45 !important;
+}
+
+/* Custom styling to make the drag ghost border perfect in Chrome and Brave */
+.dragging-active {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  transition: none !important;
+  transform: none !important;
+  border-radius: 16px !important; /* matches rounded-2xl */
+  overflow: hidden !important;
+}
+
+.dragging-source {
+  opacity: 0.45 !important;
+  border: 2px dashed #cbd5e1 !important; /* slate-300 dashed border */
+  box-shadow: none !important;
+  background-color: #f8fafc !important; /* slate-50 background for source placeholder */
+  overflow: hidden !important;
+}
+
