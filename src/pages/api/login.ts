@@ -129,7 +129,7 @@ export interface LoginVerifyResponse {
     full_name: string;
     contact_number: string;
     role: string;
-    broker_id: number;
+    broker_id?: number;
     email?: string;
     permissions?: UserPermissions;
     [key: string]: any;
