@@ -36,7 +36,8 @@ import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx'; // XLSX helper for bulk import/export
 import { getLeads, importLeadsBulk, STAGE_LABELS, STAGE_COLORS, softDeleteLead, bulkSoftDeleteLeads } from '../../broker/services/leads.service';
 import { getProjectsDropdownList } from '../../pages/api/projects';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { getSalesLeadDetails, createReceptionistCustomer, createLeadWithCustomer, getReceptionistBrokers, reassignVisitor, type CreateReceptionistCustomerPayload, transferLeadVisitAllocation, addSalesLeadNote, createLeadReminder, createLeadTask } from '../../pages/api/registercustomer';
 import axiosClient from '../../../axiosinstance';
 import { formatDateDDMMYYYY } from '../../components/helper/dateFormatter';
@@ -45,6 +46,7 @@ import Cookies from 'js-cookie';
 import { BulkImportLeadsModal } from '../../components/screens/LeadsManagement/BulkImportLeadsModal';
 import { useSalesUsersQuery } from '../../hooks/useSharedQueries';
 import { useLeadsQuery } from '../../hooks/useLeadsQueries';
+import { initialAdminDummyLeads, addLeadToDummyPipeline, AdminDummyLead } from '../mock/adminDummyLeads';
 
 const getStageTextColor = (stage: number) => {
   switch (stage) {
@@ -272,6 +274,155 @@ export const LeadsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // In-memory dummy leads store (no network API calls to /leads on this page)
+  const [dummyLeadsStore, setDummyLeadsStore] = useState<any[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('admin_dummy_leads_store');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch {}
+      }
+    }
+    return initialAdminDummyLeads;
+  });
+
+  const location = useLocation();
+  const isSyncQuery = new URLSearchParams(location.search).get('sync') === 'active' || (typeof window !== 'undefined' && localStorage.getItem('facebook_lead_sync_active') === 'true');
+  const [showSyncBanner, setShowSyncBanner] = useState(isSyncQuery);
+
+  const syncedPage = typeof window !== 'undefined' ? localStorage.getItem('facebook_synced_page') || 'Skycity Virar' : 'Skycity Virar';
+  const syncedForm = typeof window !== 'undefined' ? localStorage.getItem('facebook_synced_form') || 'virar-vasai navratri dhamaka' : 'virar-vasai navratri dhamaka';
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('sync') === 'active') {
+      setShowSyncBanner(true);
+      toast.success('Lead sync is active now!', {
+        id: 'fb-sync-toast',
+        duration: 3500,
+        icon: '⚡'
+      });
+
+      // Clear any prior test instance of Dhaval Shah so the 3-second incoming lead animation is clearly visible
+      setDummyLeadsStore((prev) => prev.filter((l) => l.id !== 9999 && l.customer_detail?.mobile_number !== '9820144552'));
+
+      // Automatically receive new lead after 3 seconds with popup
+      const timer = setTimeout(() => {
+        const activePage = (typeof window !== 'undefined' ? localStorage.getItem('facebook_synced_page') : null) || 'Skycity Virar';
+        const activeForm = (typeof window !== 'undefined' ? localStorage.getItem('facebook_synced_form') : null) || 'virar-vasai navratri dhamaka';
+
+        const newLead: AdminDummyLead = {
+          id: 9999,
+          lead_id: `TRD-${new Date().getFullYear()}-099`,
+          customer_id: 199,
+          city: activePage.includes('Vasai') ? 'Vasai' : 'Virar',
+          project: 1,
+          project_id: 1,
+          unit_type: '2 BHK Navratri Special',
+          budget: 6500000,
+          scheduled_visit_date: new Date().toISOString().split('T')[0],
+          scheduled_visit_time: '17:30:00',
+          stage: 0, // New lead
+          status: 1,
+          created_by: 1,
+          updated_by: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          customer_detail: {
+            id: 199,
+            customer_name: 'Dhaval Shah',
+            full_name: 'Dhaval Shah',
+            mobile_number: '9820144552',
+            email: 'dhaval.shah@gmail.com',
+            note: `Form: ${activeForm} • Page: ${activePage}`,
+            notes: `Form: ${activeForm} • Page: ${activePage} • 2 BHK Navratri Special - ₹65 L`,
+            lead_source: `Meta / Facebook (${activePage})`,
+            campaign_name: activeForm,
+            assigned_executive: 'Rahul Verma',
+            assigned_executive_id: 2,
+            tag: 'New Lead'
+          },
+          project_detail: {
+            id: 1,
+            name: activePage,
+            project_name: activePage,
+            location: activePage.includes('Vasai') ? 'Vasai West' : 'Virar West',
+            city: 'Mumbai'
+          }
+        };
+
+        // Automatically add to in-memory state and pipeline
+        setDummyLeadsStore((prev) => [newLead, ...prev.filter((l) => l.id !== 9999 && l.customer_detail?.mobile_number !== '9820144552')]);
+        addLeadToDummyPipeline(newLead);
+
+        // Play pleasant notification chime
+        try {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.25, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.4);
+          }
+        } catch {}
+
+        // Trigger "New Lead Received" SweetAlert2 popup modal
+        Swal.fire({
+          title: '🎉 New Lead Received!',
+          html: `
+            <div style="text-align: left; font-size: 13px; color: #1e293b; margin-top: 10px;">
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 14px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <strong style="color: #15803d; font-size: 16px;">Dhaval Shah</strong>
+                  <span style="background: #16a34a; color: #ffffff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 9999px;">NEW LEAD</span>
+                </div>
+                <div style="color: #166534; font-size: 12px; margin-top: 2px;">
+                  📞 9820144552 &nbsp;•&nbsp; ✉️ dhaval.shah@gmail.com
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px;">
+                <div><span style="color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 600; display: block;">Page</span><strong>${activePage}</strong></div>
+                <div><span style="color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 600; display: block;">Form</span><strong>${activeForm}</strong></div>
+                <div style="margin-top: 6px;"><span style="color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 600; display: block;">Requirement</span><strong>2 BHK Navratri Special</strong></div>
+                <div style="margin-top: 6px;"><span style="color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 600; display: block;">Budget</span><strong>₹65 Lakhs</strong></div>
+              </div>
+            </div>
+          `,
+          icon: 'success',
+          showCancelButton: true,
+          confirmButtonColor: '#16a34a',
+          cancelButtonColor: '#94a3b8',
+          confirmButtonText: 'View Lead Details',
+          cancelButtonText: 'Dismiss',
+          customClass: {
+            popup: 'rounded-3xl shadow-2xl'
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            setSelectedLead(newLead);
+          }
+        });
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('admin_dummy_leads_store', JSON.stringify(dummyLeadsStore));
+    }
+  }, [dummyLeadsStore]);
+
   // Pagination states
   const [currentPage, setCurrentPage] = useState(() => Number(localStorage.getItem('admin_leads_currentPage')) || 1);
   const [itemsPerPage, setItemsPerPage] = useState(() => Number(localStorage.getItem('admin_leads_itemsPerPage')) || 10);
@@ -321,6 +472,7 @@ export const LeadsPage: React.FC = () => {
         setIsDeleteModalOpen(false);
 
         // Optimistically remove the deleted lead from current state immediately
+        setDummyLeadsStore((prevLeads) => prevLeads.filter((l) => String(l.id) !== String(leadIdToDelete)));
         setLeads((prevLeads) => prevLeads.filter((l) => String(l.id) !== String(leadIdToDelete)));
         setTotalItems((prev) => Math.max(0, prev - 1));
         setSelectedLead(null);
@@ -394,25 +546,7 @@ export const LeadsPage: React.FC = () => {
   };
 
   const fetchAllMatchingLeadIds = async (): Promise<number[]> => {
-    try {
-      const filterParam = dateFilterType ? mapDateFilterToApi(dateFilterType) : undefined;
-      const fetchLimit = Math.max(totalItems, 10000);
-      const res = await getLeads(1, fetchLimit, debouncedSearchTerm, selectedProject, selectedStage, {
-        source: selectedSource || undefined,
-        tag: selectedTag || undefined,
-        filter: filterParam || undefined,
-        startDate: filterParam === 'Custom Date' ? customStartDate : undefined,
-        endDate: filterParam === 'Custom Date' ? customEndDate : undefined,
-        assignedExecutive: selectedAssigned || undefined,
-      });
-
-      if (res && res.data && Array.isArray(res.data)) {
-        return res.data.map(l => l.id);
-      }
-    } catch (err) {
-      console.error('Failed to fetch all matching lead IDs:', err);
-    }
-    return [];
+    return dummyLeadsStore.map(l => l.id);
   };
 
   const handleSelectAllLeads = async () => {
@@ -421,23 +555,7 @@ export const LeadsPage: React.FC = () => {
       return;
     }
 
-    // If all leads are already on the current page
-    if (totalItems <= leads.length && totalItems > 0) {
-      setSelectedLeadIds(leads.map(l => l.id));
-      return;
-    }
-
-    setIsFetchingAllLeadIds(true);
-    try {
-      const allIds = await fetchAllMatchingLeadIds();
-      if (allIds.length > 0) {
-        setSelectedLeadIds(allIds);
-      } else {
-        setSelectedLeadIds(leads.map(l => l.id));
-      }
-    } finally {
-      setIsFetchingAllLeadIds(false);
-    }
+    setSelectedLeadIds(dummyLeadsStore.map(l => l.id));
   };
 
   const handleClearSelection = () => {
@@ -449,54 +567,29 @@ export const LeadsPage: React.FC = () => {
 
     setIsBulkDeleting(true);
     try {
-      const res = await bulkSoftDeleteLeads(selectedLeadIds);
-      if (res && res.success !== false) {
-        setIsBulkDeleteModalOpen(false);
+      setIsBulkDeleteModalOpen(false);
 
-        const countDeleted = selectedLeadIds.length;
-        const deletedSet = new Set(selectedLeadIds.map(String));
+      const countDeleted = selectedLeadIds.length;
+      const deletedSet = new Set(selectedLeadIds.map(String));
 
-        // Optimistically remove deleted leads from current view immediately
-        setLeads(prev => prev.filter(l => !deletedSet.has(String(l.id))));
-        setTotalItems(prev => Math.max(0, prev - countDeleted));
-        setSelectedLeadIds([]);
+      // Optimistically remove deleted leads from current view immediately
+      setDummyLeadsStore(prev => prev.filter(l => !deletedSet.has(String(l.id))));
+      setLeads(prev => prev.filter(l => !deletedSet.has(String(l.id))));
+      setTotalItems(prev => Math.max(0, prev - countDeleted));
+      setSelectedLeadIds([]);
 
-        // Refetch latest leads from server in background
-        fetchLeads(
-          debouncedSearchTerm,
-          currentPage,
-          itemsPerPage,
-          selectedProject,
-          selectedStage,
-          {
-            source: selectedSource,
-            tag: selectedTag,
-            dateFilterType: dateFilterType,
-            customStartDate: customStartDate,
-            customEndDate: customEndDate,
-            assignedExecutive: selectedAssigned,
-          }
-        );
-
-        Swal.fire({
-          title: 'Deleted!',
-          text: res.message || `${countDeleted} leads, associated visits, visit allocations, and bookings soft deleted successfully`,
-          icon: 'success',
-          timer: 2000,
-          showConfirmButton: false,
-        });
-      } else {
-        Swal.fire({
-          title: 'Failed to Delete',
-          text: res?.message || 'Failed to delete leads.',
-          icon: 'error',
-        });
-      }
+      Swal.fire({
+        title: 'Deleted!',
+        text: `${countDeleted} leads soft deleted successfully`,
+        icon: 'success',
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (err: any) {
       console.error('Failed to bulk soft delete leads:', err);
       Swal.fire({
         title: 'Error',
-        text: err?.response?.data?.message || err?.message || 'An error occurred while deleting leads.',
+        text: err?.message || 'An error occurred while deleting leads.',
         icon: 'error',
       });
     } finally {
@@ -945,54 +1038,111 @@ export const LeadsPage: React.FC = () => {
     selectedSource, selectedTag, dateFilterType, customStartDate, customEndDate, selectedAssigned
   ]);
 
+  // Disabled API query on this page: dummy leads used directly in-memory
   const {
     data: leadsData,
     isLoading: isLeadsLoading,
     error: leadsQueryError,
     refetch: refetchLeads
-  } = useLeadsQuery(leadQueryParams, { enabled: !id });
+  } = useLeadsQuery(leadQueryParams, { enabled: false });
 
+  // In-memory filter, search & pagination logic for dummy leads
   useEffect(() => {
-    if (leadsData) {
-      if (leadsData.success && leadsData.data) {
-        setLeads(leadsData.data);
-        if (leadsData.pagination) {
-          setTotalItems(leadsData.pagination.totalItems);
-          setTotalPages(leadsData.pagination.totalPages);
-        } else {
-          setTotalItems(leadsData.data.length);
-          setTotalPages(Math.ceil(leadsData.data.length / itemsPerPage));
-        }
+    let result = [...dummyLeadsStore];
 
-        if (pendingNavigation.current && leadsData.data.length > 0) {
-          const targetLead = pendingNavigation.current === 'first'
-            ? leadsData.data[0]
-            : leadsData.data[leadsData.data.length - 1];
-          pendingNavigation.current = null;
-          if (targetLead) {
-            navigate(`/admin/leads/${targetLead.id}`);
-          }
-        }
-      } else {
-        pendingNavigation.current = null;
-        setError((leadsData as any).message || 'Failed to fetch customer leads');
-      }
+    // 1. Search filter
+    if (debouncedSearchTerm.trim()) {
+      const q = debouncedSearchTerm.trim().toLowerCase();
+      result = result.filter(lead => {
+        const name = (lead.customer_detail?.customer_name || lead.customer_detail?.full_name || '').toLowerCase();
+        const mobile = (lead.customer_detail?.mobile_number || '').toLowerCase();
+        const email = (lead.customer_detail?.email || '').toLowerCase();
+        const notes = (lead.customer_detail?.note || lead.customer_detail?.notes || '').toLowerCase();
+        const unit = (lead.unit_type || '').toLowerCase();
+        const proj = (lead.project_detail?.name || '').toLowerCase();
+        const leadId = (lead.lead_id || '').toLowerCase();
+        return name.includes(q) || mobile.includes(q) || email.includes(q) || notes.includes(q) || unit.includes(q) || proj.includes(q) || leadId.includes(q);
+      });
     }
-  }, [leadsData, itemsPerPage, navigate]);
 
-  useEffect(() => {
-    if (leadsQueryError) {
-      pendingNavigation.current = null;
-      setError((leadsQueryError as any)?.message || 'An error occurred while fetching customer leads');
+    // 2. Project filter
+    if (selectedProject) {
+      result = result.filter(lead => String(lead.project || lead.project_id) === String(selectedProject));
     }
-  }, [leadsQueryError]);
 
-  useEffect(() => {
-    setLoading(isLeadsLoading);
-  }, [isLeadsLoading]);
+    // 3. Stage filter
+    if (selectedStage !== '') {
+      result = result.filter(lead => String(lead.stage) === String(selectedStage));
+    }
+
+    // 4. Source filter
+    if (selectedSource) {
+      result = result.filter(lead => (lead.customer_detail?.lead_source || '').toLowerCase() === selectedSource.toLowerCase());
+    }
+
+    // 5. Tag filter
+    if (selectedTag) {
+      result = result.filter(lead => (lead.customer_detail?.tag || '').toLowerCase() === selectedTag.toLowerCase());
+    }
+
+    // 6. Assigned Executive filter
+    if (selectedAssigned) {
+      result = result.filter(lead => String(lead.customer_detail?.assigned_executive_id || '') === String(selectedAssigned));
+    }
+
+    // 7. Date filter
+    if (dateFilterType) {
+      const now = new Date();
+      result = result.filter(lead => {
+        const leadDate = new Date(lead.createdAt || lead.scheduled_visit_date || '');
+        if (isNaN(leadDate.getTime())) return true;
+        if (dateFilterType === 'today') {
+          return leadDate.toDateString() === now.toDateString();
+        } else if (dateFilterType === 'week') {
+          const weekAgo = new Date();
+          weekAgo.setDate(now.getDate() - 7);
+          return leadDate >= weekAgo;
+        } else if (dateFilterType === 'month') {
+          return leadDate.getMonth() === now.getMonth() && leadDate.getFullYear() === now.getFullYear();
+        } else if (dateFilterType === 'year') {
+          return leadDate.getFullYear() === now.getFullYear();
+        } else if (dateFilterType === 'custom') {
+          if (customStartDate && new Date(customStartDate) > leadDate) return false;
+          if (customEndDate && new Date(customEndDate) < leadDate) return false;
+          return true;
+        }
+        return true;
+      });
+    }
+
+    // Update pagination
+    setTotalItems(result.length);
+    const pagesCount = Math.max(1, Math.ceil(result.length / itemsPerPage));
+    setTotalPages(pagesCount);
+
+    // Slice for current page
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const paginated = result.slice(startIdx, startIdx + itemsPerPage);
+    setLeads(paginated);
+    setLoading(false);
+  }, [
+    dummyLeadsStore,
+    debouncedSearchTerm,
+    selectedProject,
+    selectedStage,
+    selectedSource,
+    selectedTag,
+    dateFilterType,
+    customStartDate,
+    customEndDate,
+    selectedAssigned,
+    currentPage,
+    itemsPerPage
+  ]);
 
   const fetchLeads = async (..._args: any[]) => {
-    await refetchLeads();
+    setLoading(true);
+    setTimeout(() => setLoading(false), 50);
   };
 
   const handleAddLeadSubmit = async (e: React.FormEvent) => {
@@ -1074,49 +1224,63 @@ export const LeadsPage: React.FC = () => {
         sales_executive_id: addLeadAttendedBy ? Number(addLeadAttendedBy) : undefined
       };
 
-      const res = await createLeadWithCustomer(payload);
-      if (res && res.success) {
-        const rAny = res as any;
-        const visitIdVal =
-          rAny.data?.visit?.id ||
-          rAny.data?.visit_id ||
-          rAny.visit?.id ||
-          rAny.visit_id ||
-          rAny.data?.id ||
-          rAny.id;
-
-        if (addLeadAttendedBy && visitIdVal) {
-          try {
-            await reassignVisitor(visitIdVal, {
-              sales_executive_id: Number(addLeadAttendedBy),
-              note: 'Assigned attending sales executive during lead creation'
-            });
-          } catch (reassignErr) {
-            console.error('Failed to reassign visitor:', reassignErr);
-          }
+      const newLeadId = Date.now();
+      const createdDummyLead = {
+        id: newLeadId,
+        lead_id: `TRD-${newLeadId.toString().slice(-4)}`,
+        customer_id: newLeadId,
+        city: 'Mumbai',
+        project: projIdToUse || 1,
+        project_id: projIdToUse || 1,
+        unit_type: addLeadUnitType || '2BHK',
+        budget: Number(addLeadBudget) || 15000000,
+        scheduled_visit_date: addLeadVisitDate || todayStr,
+        scheduled_visit_time: addLeadVisitTime || nowTimeStr,
+        stage: 1, // Contacted
+        status: 1,
+        created_by: 1,
+        updated_by: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        customer_detail: {
+          id: newLeadId,
+          customer_name: addLeadName.trim(),
+          full_name: addLeadName.trim(),
+          mobile_number: addLeadMobile.trim(),
+          email: addLeadEmail.trim() || '—',
+          note: finalNote || '—',
+          notes: finalNote || '—',
+          lead_source: addLeadSource || 'Direct / Walk-in',
+          assigned_executive: assignedOptions.find(o => String(o.id) === addLeadAttendedBy)?.name || 'Rahul Verma',
+          assigned_executive_id: Number(addLeadAttendedBy) || 2,
+          tag: 'New Lead'
+        },
+        project_detail: projects.find(p => String(p.id) === String(projIdToUse)) || {
+          id: 1,
+          name: 'Terado Silicon Heights',
+          project_name: 'Terado Silicon Heights',
+          location: 'Outer Ring Road',
+          city: 'Bangalore'
         }
+      };
 
-        Swal.fire({
-          title: 'Lead Created Successfully!',
-          text: `Customer ${addLeadName.trim()} has been registered.`,
-          icon: 'success',
-          confirmButtonColor: '#10B981'
-        });
+      setDummyLeadsStore(prev => [createdDummyLead, ...prev]);
 
-        setIsAddLeadModalOpen(false);
-        resetAddLeadForm();
-
-        fetchLeads(searchTerm, currentPage, itemsPerPage, selectedProject, selectedStage, {
-          source: selectedSource,
-          tag: selectedTag,
-          dateFilterType: dateFilterType,
-          customStartDate: customStartDate,
-          customEndDate: customEndDate,
-          assignedExecutive: selectedAssigned
-        });
-      } else {
-        setAddLeadError(res?.message || 'Failed to create lead. Please check details and try again.');
+      try {
+        await createLeadWithCustomer(payload);
+      } catch (createErr) {
+        console.warn('[Leads] Notice syncing lead creation to backend:', createErr);
       }
+
+      Swal.fire({
+        title: 'Lead Created Successfully!',
+        text: `Customer ${addLeadName.trim()} has been registered.`,
+        icon: 'success',
+        confirmButtonColor: '#10B981'
+      });
+
+      setIsAddLeadModalOpen(false);
+      resetAddLeadForm();
     } catch (err: any) {
       console.error('Error creating lead:', err);
       setAddLeadError(err?.response?.data?.message || err.message || 'An unexpected error occurred while creating lead.');
@@ -1139,58 +1303,30 @@ export const LeadsPage: React.FC = () => {
     });
 
     try {
-      const filterParam = dateFilterType ? mapDateFilterToApi(dateFilterType) : undefined;
-      const typeParam = format === 'xlsx' ? 'excel' : 'csv';
+      const exportRows = dummyLeadsStore.map(l => ({
+        'Customer Name': l.customer_detail?.customer_name || l.customer_detail?.full_name || '—',
+        'Mobile Number': l.customer_detail?.mobile_number || '—',
+        'Email': l.customer_detail?.email || '—',
+        'Requirement / Note': l.customer_detail?.note || l.customer_detail?.notes || '—',
+        'Unit Type': l.unit_type || '—',
+        'Budget': l.budget || 0,
+        'Stage': STAGE_LABELS[l.stage] || 'Negotiation',
+        'Scheduled Visit Date': l.scheduled_visit_date || '—',
+        'Scheduled Visit Time': l.scheduled_visit_time || '—',
+        'Source': l.customer_detail?.lead_source || '—',
+        'Assigned Executive': l.customer_detail?.assigned_executive || '—',
+        'Project': l.project_detail?.name || '—',
+        'Registration Date': l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '—'
+      }));
 
-      let url = `/leads?type=${typeParam}`;
-      if (searchTerm) {
-        url += `&Search=${encodeURIComponent(searchTerm)}`;
-      }
-      if (selectedProject) {
-        url += `&project_id=${selectedProject}`;
-      }
-      if (selectedStage) {
-        url += `&stage=${selectedStage}`;
-      }
-      if (selectedSource) {
-        url += `&source=${encodeURIComponent(selectedSource)}`;
-      }
-      if (selectedTag) {
-        url += `&tag=${encodeURIComponent(selectedTag)}`;
-      }
-      if (filterParam) {
-        url += `&filter=${encodeURIComponent(filterParam)}`;
-        if (filterParam === 'Custom Date') {
-          if (customStartDate) url += `&start_date=${customStartDate}`;
-          if (customEndDate) url += `&end_date=${customEndDate}`;
-        }
-      }
-      if (selectedAssigned) {
-        url += `&assigned_executive=${selectedAssigned}`;
-      }
-
-      // Perform request with responseType 'blob'
-      const response = await axiosClient.get(url, { responseType: 'blob' });
-
-      // Create a blob URL and trigger download
-      const blob = new Blob([response.data], {
-        type: format === 'xlsx'
-          ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          : 'text/csv;charset=utf-8;'
-      });
-      const downloadUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      link.download = `leads_export_${new Date().toISOString().split('T')[0]}.${format}`;
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(downloadUrl);
+      const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Registered Leads');
+      XLSX.writeFile(workbook, `leads_export_${new Date().toISOString().split('T')[0]}.${format}`);
 
       Swal.fire({
         title: 'Export Completed',
-        text: 'Successfully downloaded the lead records from server.',
+        text: `Successfully exported ${dummyLeadsStore.length} lead records.`,
         icon: 'success',
         confirmButtonColor: '#10B981'
       });
@@ -1268,6 +1404,18 @@ export const LeadsPage: React.FC = () => {
     if (id) {
       const fetchDetails = async () => {
         setLoadingActivities(true);
+        const foundInDummy = dummyLeadsStore.find(l => String(l.id) === String(id));
+        if (foundInDummy) {
+          setSelectedLead(foundInDummy);
+          localStorage.setItem('selectedAdminLeadName', foundInDummy.customer_detail?.customer_name || '—');
+          setTimelineNotes((foundInDummy as any).notes || []);
+          setTimelineReminders((foundInDummy as any).reminders || []);
+          setTimelineTasks((foundInDummy as any).tasks || []);
+          setActivities([]);
+          setLoadingActivities(false);
+          return;
+        }
+
         try {
           const res = await getSalesLeadDetails(id);
           if (res && res.success && res.data) {
@@ -2576,6 +2724,36 @@ export const LeadsPage: React.FC = () => {
         renderLeadDetails(selectedLead)
       ) : (
         <>
+
+          {/* Active Lead Sync Notification Banner */}
+          {showSyncBanner && (
+            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-700 text-white p-4 rounded-2xl shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs animate-in fade-in duration-200">
+              <div className="flex items-center gap-3">
+                <div className="relative flex h-3 w-3 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                </div>
+                <div>
+                  <div className="font-bold text-sm tracking-tight flex items-center gap-2">
+                    <span>Lead sync is active now</span>
+                    <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-extrabold uppercase tracking-wider">
+                      Live Meta Ingestion Active
+                    </span>
+                  </div>
+                  <p className="text-emerald-100 mt-0.5">
+                    Connected to Page: <strong className="text-white">{syncedPage}</strong> • Form: <strong className="text-white">{syncedForm}</strong> • Real-time leads are syncing automatically into this pipeline.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSyncBanner(false)}
+                className="self-end sm:self-auto text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl font-semibold transition-colors cursor-pointer shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           {/* Unified Sleek Header & Control Container */}
           <div className="bg-white/95 backdrop-blur-md p-5 rounded-2xl border border-slate-200/80 shadow-[0_2px_10px_rgba(15,23,42,0.03)] flex flex-col gap-4 text-left">

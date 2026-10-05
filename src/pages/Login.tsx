@@ -1,24 +1,42 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useBrokerConnect } from '../context/BrokerConnectContext';
-import { Mail, ShieldCheck, ArrowRight, UserPlus, CheckCircle, Smartphone, ChevronLeft, Users, Sparkles } from 'lucide-react';
+import { Mail, ShieldCheck, ArrowRight, UserPlus, CheckCircle, Smartphone, ChevronLeft, Users } from 'lucide-react';
 import Cookies from 'js-cookie';
+import { requestLoginOtp, verifyLoginOtp, fetchAndStoreUserProfile } from './api/login';
 import { LockIllustration } from '../components/ui/LockIllustration';
 import { BrandLogo } from '../components/BrandLogo';
-import { mockAdminUser } from '../mock/mockData';
 
 export const Login: React.FC = () => {
   const { setCurrentRole } = useBrokerConnect();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Route state notifications (like registration success redirects)
+  // Redirect to dashboard if already logged in with active session
+  useEffect(() => {
+    const token = sessionStorage.getItem('token') || Cookies.get('token') || localStorage.getItem('token');
+    const refreshToken = localStorage.getItem('refresh_token');
+    const role = Cookies.get('userRole') || 'broker';
+
+    if (token && (refreshToken || !token.includes('mock'))) {
+      if (role === 'admin') navigate('/admin/dashboard', { replace: true });
+      else if (role === 'receptionist') navigate('/receptionist/dashboard', { replace: true });
+      else if (role === 'sales') navigate('/sales/dashboard', { replace: true });
+      else if (role === 'calling') navigate('/calling/dashboard', { replace: true });
+      else if (role === 'channel_partner') navigate('/channel-partner/dashboard', { replace: true });
+      else navigate('/broker/dashboard', { replace: true });
+    }
+  }, [navigate]);
+
+  // Route state notifications (e.g. registration success)
   const redirectSuccess = (location.state?.success as string) || '';
   const redirectError = (location.state?.error as string) || '';
 
   // Form States
-  const [emailOrPhone, setEmailOrPhone] = useState('admin@teradocrm.com');
-  const [rememberMe, setRememberMe] = useState(true);
+  const [emailOrPhone, setEmailOrPhone] = useState(() => Cookies.get('remember_me_email_or_phone') || '');
+  const [rememberMe, setRememberMe] = useState(() => Cookies.get('remember_me_checked') === 'true');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const savedEmailOrPhone = Cookies.get('remember_me_email_or_phone');
   const [otpStep, setOtpStep] = useState(false);
   const [pin, setPin] = useState('');
   const [pinKey, setPinKey] = useState(0);
@@ -29,44 +47,225 @@ export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  // Clear stale non-admin cookies on mount to avoid unwanted broker redirects
-  React.useEffect(() => {
-    Cookies.set('userRole', 'admin', { expires: 7 });
+  // Auto-dismiss loginSuccess after 5 seconds
+  useEffect(() => {
+    if (loginSuccess) {
+      const timer = setTimeout(() => {
+        setLoginSuccess('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [loginSuccess]);
+
+  // Check URL query parameters for redirect errors
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const err = params.get('error');
+    if (err === 'session_expired') {
+      setLoginError('Your session has expired. Please log in again.');
+      navigate('/login', { replace: true, state: {} });
+    } else if (err === 'unauthorized') {
+      setLoginError('Authorization token is missing. Please log in to continue.');
+      navigate('/login', { replace: true, state: {} });
+    }
+  }, [location.search, navigate]);
+
+  // Check cooldown on mount
+  useEffect(() => {
+    const expiresAtStr = localStorage.getItem('resend_otp_cooldown_expires_at');
+    if (expiresAtStr) {
+      const expiresAt = parseInt(expiresAtStr, 10);
+      const now = Date.now();
+      if (expiresAt > now) {
+        setResendCooldown(Math.ceil((expiresAt - now) / 1000));
+      }
+    }
   }, []);
 
-  // Direct login to Admin without OTP or refresh tokens
-  const handleDirectAdminLogin = () => {
-    setLoading(true);
-    setIsVerified(true);
+  // Cooldown countdown effect
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
 
-    const token = 'terado-admin-mock-token';
-    sessionStorage.setItem('token', token);
-    Cookies.set('token', token, { expires: 7 });
-    Cookies.set('userRole', 'admin', { expires: 7 });
-    Cookies.set('full_name', 'Terado Admin', { expires: 7 });
-    Cookies.set('is_profile_completed', '1', { expires: 7 });
-    localStorage.setItem('user', JSON.stringify(mockAdminUser));
-    localStorage.setItem('user_permissions', JSON.stringify(mockAdminUser.permissions));
+    const timer = setTimeout(() => {
+      const expiresAtStr = localStorage.getItem('resend_otp_cooldown_expires_at');
+      if (expiresAtStr) {
+        const expiresAt = parseInt(expiresAtStr, 10);
+        const now = Date.now();
+        if (expiresAt > now) {
+          setResendCooldown(Math.ceil((expiresAt - now) / 1000));
+        } else {
+          setResendCooldown(0);
+          localStorage.removeItem('resend_otp_cooldown_expires_at');
+        }
+      } else {
+        setResendCooldown(0);
+      }
+    }, 1000);
 
-    setCurrentRole('admin');
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
-    setTimeout(() => {
-      navigate('/admin/dashboard');
-    }, 500);
-  };
-
-  const handleSendOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-    setOtpStep(true);
-    setPin('123456');
-    setLoginSuccess('Demo OTP code 123456 generated');
+  const startResendCooldown = () => {
+    const expiresAt = Date.now() + 30000;
+    localStorage.setItem('resend_otp_cooldown_expires_at', String(expiresAt));
     setResendCooldown(30);
   };
 
-  const handleLoginSubmit = (e?: React.FormEvent, _codeOverride?: string) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (otpStep && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+    }
+  }, [otpStep, pinKey]);
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const identifier = emailOrPhone.trim();
+    if (!identifier) {
+      setLoginError('Please enter your Email or Phone');
+      return;
+    }
+    setLoginError('');
+    setLoading(true);
+
+    try {
+      const res = await requestLoginOtp(identifier);
+      if (res.success) {
+        setOtpStep(true);
+        setPin('');
+        setLoginSuccess(res.message || 'OTP sent successfully');
+        startResendCooldown();
+
+        if (rememberMe) {
+          Cookies.set('remember_me_email_or_phone', identifier, { expires: 30 });
+          Cookies.set('remember_me_checked', 'true', { expires: 30 });
+        } else {
+          Cookies.remove('remember_me_email_or_phone');
+          Cookies.remove('remember_me_checked');
+        }
+      } else {
+        setLoginError(res.message || 'Failed to send OTP. Please check your credentials.');
+      }
+    } catch (err: any) {
+      setLoginError(err.response?.data?.message || err.message || 'An error occurred while sending OTP.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || loading) return;
+    setLoginError('');
+    setLoginSuccess('');
+    setLoading(true);
+
+    try {
+      const res = await requestLoginOtp(emailOrPhone.trim());
+      if (res.success) {
+        setLoginSuccess(res.message || 'OTP resent successfully');
+        startResendCooldown();
+      } else {
+        setLoginError(res.message || 'Failed to resend OTP.');
+      }
+    } catch (err: any) {
+      setLoginError(err.response?.data?.message || err.message || 'An error occurred while resending OTP.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e?: React.FormEvent, codeOverride?: string) => {
     if (e) e.preventDefault();
-    handleDirectAdminLogin();
+    const finalCode = codeOverride || pin;
+    if (!finalCode || finalCode.length < 6) {
+      setLoginError('Please enter the 6-digit OTP code');
+      return;
+    }
+
+    setLoading(true);
+    setLoginError('');
+
+    try {
+      const res = await verifyLoginOtp(emailOrPhone.trim(), Number(finalCode));
+      if (res.success) {
+        setIsVerified(true);
+        await new Promise((resolve) => setTimeout(resolve, 800));
+
+        const cookieToken = Cookies.get('token') || Cookies.get('userToken');
+        const userToken = res.token || cookieToken || '';
+        Cookies.set('token', userToken, { expires: 7 });
+        Cookies.set('is_profile_completed', '1', { expires: 7 });
+        sessionStorage.setItem('token', userToken);
+        localStorage.setItem('token', userToken);
+
+        if (res.refresh_token) {
+          localStorage.setItem('refresh_token', res.refresh_token);
+        }
+
+        if (res.user) {
+          localStorage.setItem('user', JSON.stringify(res.user));
+          if (res.user.permissions) {
+            localStorage.setItem('user_permissions', JSON.stringify(res.user.permissions));
+            Cookies.set('user_permissions', JSON.stringify(res.user.permissions), { expires: 7 });
+          }
+        }
+
+        try {
+          await fetchAndStoreUserProfile();
+        } catch (profileErr) {
+          console.warn('Profile fetch after login failed:', profileErr);
+        }
+
+        const backendRole = res.user?.role?.toLowerCase() || 'broker';
+
+        if (res.user?.full_name) {
+          Cookies.set('full_name', res.user.full_name, { expires: 7 });
+        } else {
+          let fallbackName = 'Broker Account';
+          if (backendRole.includes('admin')) fallbackName = 'Admin Account';
+          else if (backendRole.includes('receptionist') || backendRole.includes('receiptionist') || backendRole.includes('reception')) fallbackName = 'Receptionist Staff';
+          else if (backendRole.includes('sales')) fallbackName = 'Sales Executive';
+          else if (backendRole.includes('calling')) fallbackName = 'Calling Agent';
+          else if (backendRole.includes('channel') || backendRole.includes('partner') || backendRole.includes('cp')) fallbackName = 'Channel Partner';
+          Cookies.set('full_name', fallbackName, { expires: 7 });
+        }
+
+        let assignedRole: 'broker' | 'receptionist' | 'sales' | 'admin' | 'calling' | 'channel_partner' = 'broker';
+        if (backendRole.includes('admin')) assignedRole = 'admin';
+        else if (
+          backendRole.includes('receptionist') ||
+          backendRole.includes('receiptionist') ||
+          backendRole.includes('reception')
+        ) assignedRole = 'receptionist';
+        else if (backendRole.includes('sales')) assignedRole = 'sales';
+        else if (backendRole.includes('calling')) assignedRole = 'calling';
+        else if (
+          backendRole.includes('channel') ||
+          backendRole.includes('partner') ||
+          backendRole.includes('cp')
+        ) assignedRole = 'channel_partner';
+        else if (backendRole.includes('broker')) assignedRole = 'broker';
+
+        Cookies.set('userRole', assignedRole, { expires: 7 });
+        setCurrentRole(assignedRole);
+
+        if (assignedRole === 'admin') navigate('/admin/dashboard', { replace: true });
+        else if (assignedRole === 'receptionist') navigate('/receptionist/dashboard', { replace: true });
+        else if (assignedRole === 'sales') navigate('/sales/dashboard', { replace: true });
+        else if (assignedRole === 'calling') navigate('/calling/dashboard', { replace: true });
+        else if (assignedRole === 'channel_partner') navigate('/channel-partner/dashboard', { replace: true });
+        else navigate('/broker/dashboard', { replace: true });
+      } else {
+        setLoginError(res.message || 'Invalid OTP code.');
+      }
+    } catch (err: any) {
+      setLoginError(err.response?.data?.message || err.message || 'An error occurred during verification.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,12 +273,16 @@ export const Login: React.FC = () => {
     if (val.length <= 6) {
       setPin(val);
       if (val.length === 6) {
-        handleDirectAdminLogin();
+        handleLoginSubmit(undefined, val);
+      } else {
+        setLoginError('');
       }
     }
   };
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const handleCircleClick = () => {
+    inputRef.current?.focus();
+  };
 
   const handleBackToEmail = () => {
     setOtpStep(false);
@@ -90,10 +293,26 @@ export const Login: React.FC = () => {
   };
 
   const maskContact = (value: string): string => {
-    if (value.includes('@')) {
-      return value;
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (trimmed.includes('@')) {
+      const [local, domain] = trimmed.split('@');
+      const maskedLocal = local.length <= 2
+        ? local[0] + '•'.repeat(local.length - 1)
+        : local[0] + '•'.repeat(Math.min(Math.max(local.length - 2, 2), 5)) + local[local.length - 1];
+      const dotIdx = domain.lastIndexOf('.');
+      const domainName = domain.slice(0, dotIdx);
+      const tld = domain.slice(dotIdx);
+      const maskedDomain = domainName.length <= 2
+        ? domainName[0] + '•'.repeat(domainName.length - 1)
+        : domainName[0] + '•'.repeat(Math.min(Math.max(domainName.length - 2, 3), 5)) + domainName[domainName.length - 1];
+      return `${maskedLocal}@${maskedDomain}${tld}`;
     }
-    return value.length >= 6 ? value.slice(0, 2) + '••••' + value.slice(-3) : value;
+    const digits = trimmed.replace(/\D/g, '');
+    if (digits.length >= 6) {
+      return digits.slice(0, 2) + '•'.repeat(Math.min(digits.length - 5, 5)) + digits.slice(-3);
+    }
+    return trimmed[0] + '•'.repeat(Math.min(Math.max(trimmed.length - 2, 2), 5)) + trimmed[trimmed.length - 1];
   };
 
   return (
@@ -117,7 +336,7 @@ export const Login: React.FC = () => {
         <div className="relative z-10 my-auto py-2 xl:py-6 flex flex-col justify-center space-y-4 xl:space-y-6">
           <div className="space-y-3">
             <span className="inline-block px-3 py-1 bg-white/8 text-sky-300 border border-white/10 backdrop-blur-sm text-[9px] font-extrabold rounded-full uppercase tracking-widest anim-fade-up">
-              Meta Verification Prototype
+              Enterprise Lead Protection
             </span>
             <div className="space-y-2">
               <h1 className="text-2xl xl:text-3xl font-black tracking-tight leading-[1.2] bg-gradient-to-br from-white via-white to-blue-200 bg-clip-text text-transparent anim-fade-up">
@@ -141,7 +360,7 @@ export const Login: React.FC = () => {
                 <span className="text-[9px] text-blue-300/70 font-semibold block">Protected audit trails &amp; fraud prevention</span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3.5 text-xs font-semibold text-blue-200">
               <div className="w-9 h-9 rounded-xl bg-white/6 border border-white/10 flex items-center justify-center text-[#38A3F8] shrink-0 shadow-xs">
                 <Users className="w-4 h-4" />
@@ -175,28 +394,8 @@ export const Login: React.FC = () => {
                 Welcome Back
               </h2>
               <p className="text-[10px] lg:text-slate-400 text-blue-300/80 font-bold uppercase tracking-wider block">
-                {otpStep ? 'Verify identity' : 'Access Admin Dashboard & Leads Management'}
+                {otpStep ? 'Verify your identity' : 'Access Dashboard & Leads Management'}
               </p>
-            </div>
-
-            {/* Instant Admin Access Button (Top Callout) */}
-            <div className="p-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg text-white space-y-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
-                <span className="text-xs font-black uppercase tracking-wider">Quick Admin Access</span>
-              </div>
-              <p className="text-[11px] text-blue-100 leading-snug">
-                Click below to instantly access the Admin Profile &amp; Lead Management dashboard.
-              </p>
-              <button
-                type="button"
-                onClick={handleDirectAdminLogin}
-                className="w-full mt-2 py-2.5 px-4 bg-white hover:bg-slate-50 text-[#1062AC] rounded-xl font-black text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-              >
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span>Enter Admin Dashboard Directly</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
             </div>
 
             {loginSuccess && (
@@ -225,12 +424,32 @@ export const Login: React.FC = () => {
                     </span>
                     <input
                       type="text"
-                      placeholder="Enter email or phone"
+                      placeholder="Enter registered email or phone"
                       value={emailOrPhone}
                       onChange={(e) => setEmailOrPhone(e.target.value)}
+                      onFocus={() => setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                       className="block w-full pl-10 pr-4 py-3 lg:bg-white bg-white/5 lg:border-slate-200 border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 lg:text-slate-800 text-white placeholder-slate-400 font-semibold"
                       required
+                      autoComplete="off"
                     />
+
+                    {/* Autocomplete suggestion dropdown */}
+                    {showSuggestions && savedEmailOrPhone && savedEmailOrPhone.toLowerCase().includes(emailOrPhone.toLowerCase()) && (
+                      <div className="absolute z-20 left-0 right-0 mt-1.5 lg:bg-white bg-slate-900 lg:border-slate-200 border-white/10 rounded-xl shadow-lg border overflow-hidden py-1 max-h-48 overflow-y-auto">
+                        <button
+                          type="button"
+                          onMouseDown={() => {
+                            setEmailOrPhone(savedEmailOrPhone);
+                            setShowSuggestions(false);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs font-semibold lg:text-slate-700 text-slate-200 lg:hover:bg-slate-50 hover:bg-white/5 transition flex items-center gap-2"
+                        >
+                          <Mail className="w-3.5 h-3.5 lg:text-slate-400 text-white/40" />
+                          <span>{savedEmailOrPhone}</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -249,10 +468,16 @@ export const Login: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center items-center gap-2 py-3.5 bg-[#1062AC] hover:bg-[#0D4E8C] text-white rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer"
+                  className="w-full flex justify-center items-center gap-2 py-3.5 bg-[#1062AC] hover:bg-[#0D4E8C] disabled:bg-blue-300 text-white rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer"
                 >
-                  <span>Send OTP Code</span>
-                  <ArrowRight className="w-4 h-4" />
+                  {loading ? (
+                    <div className="w-4.5 h-4.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      <span>Send OTP Code</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </form>
             ) : (
@@ -260,7 +485,11 @@ export const Login: React.FC = () => {
               <form onSubmit={(e) => handleLoginSubmit(e)} className="space-y-5">
                 <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl lg:bg-blue-50/70 bg-white/5 border lg:border-blue-100 border-white/10">
                   <div className="w-7 h-7 rounded-lg lg:bg-blue-100 bg-white/10 flex items-center justify-center shrink-0">
-                    <Smartphone className="w-3.5 h-3.5 lg:text-blue-500 text-sky-400" />
+                    {emailOrPhone.includes('@') ? (
+                      <Mail className="w-3.5 h-3.5 lg:text-blue-500 text-sky-400" />
+                    ) : (
+                      <Smartphone className="w-3.5 h-3.5 lg:text-blue-500 text-sky-400" />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[9px] font-bold lg:text-slate-400 text-white/40 uppercase tracking-wider">OTP sent to</p>
@@ -281,11 +510,8 @@ export const Login: React.FC = () => {
                 <div className="space-y-2.5">
                   <div className="flex justify-between items-center">
                     <label className="text-[10px] font-bold lg:text-slate-500 text-white/50 uppercase block tracking-wider">
-                      OTP Security PIN
+                      OTP Security PIN <span className="text-red-500 ml-0.5">*</span>
                     </label>
-                    <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
-                      Demo Code: 123456
-                    </span>
                   </div>
 
                   <div className="relative py-4 flex justify-center overflow-hidden min-h-[80px]">
@@ -315,14 +541,19 @@ export const Login: React.FC = () => {
                     </div>
 
                     {/* OTP Circles */}
-                    <div className="flex gap-2.5 justify-center relative select-none w-full" style={{ zIndex: 1 }}>
+                    <div
+                      className="flex gap-2.5 justify-center relative select-none w-full"
+                      onClick={handleCircleClick}
+                      style={{ zIndex: 1 }}
+                    >
                       {Array.from({ length: 6 }).map((_, index) => {
                         const char = pin[index] || '';
                         const isFocused = pin.length === index;
+                        const isComplete = pin.length === 6;
                         return (
                           <div
                             key={index}
-                            className={`w-11 h-11 rounded-full border-2 lg:bg-white bg-white/5 flex items-center justify-center text-base font-black transition-all ${
+                            className={`w-11 h-11 rounded-full border-2 lg:bg-white bg-white/5 flex items-center justify-center text-base font-black relative transition-all ${
                               char
                                 ? 'border-orange-500'
                                 : isFocused
@@ -331,6 +562,15 @@ export const Login: React.FC = () => {
                             }`}
                           >
                             {char ? <span>{char}</span> : <span className="text-slate-300">•</span>}
+
+                            {isComplete && !isVerified && (
+                              <div
+                                className="absolute inset-0 rounded-full animate-spin"
+                                style={{ animationDuration: '1.5s' }}
+                              >
+                                <div className="absolute top-0 left-1/2 w-1.5 h-1.5 -translate-x-1/2 -translate-y-1/2 bg-orange-500 rounded-full shadow-sm" />
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -339,29 +579,27 @@ export const Login: React.FC = () => {
                 </div>
 
                 <div className="flex justify-between items-center text-xs font-semibold px-1">
-                  <span className="text-slate-400">Didn't receive code?</span>
+                  <span className="lg:text-slate-400 text-white/50">Didn't receive the OTP?</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setPin('123456');
-                      setLoginSuccess('Demo code 123456 auto-filled');
-                    }}
-                    className="text-blue-600 font-bold hover:underline cursor-pointer"
+                    onClick={handleResendOtp}
+                    disabled={resendCooldown > 0 || loading}
+                    className="lg:text-blue-600 text-sky-400 hover:underline font-bold disabled:text-slate-400 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    Auto-Fill 123456
+                    {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
                   </button>
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex justify-center items-center gap-2 py-3.5 bg-[#1062AC] hover:bg-[#0D4E8C] text-white rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer"
+                  className="w-full flex justify-center items-center gap-2 py-3.5 bg-[#1062AC] hover:bg-[#0D4E8C] disabled:bg-blue-300 text-white rounded-xl font-bold text-sm transition-all shadow-md cursor-pointer"
                 >
                   {loading ? (
                     <div className="w-4.5 h-4.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      <span>Verify &amp; Enter Dashboard</span>
+                      <span>Verify &amp; Login</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

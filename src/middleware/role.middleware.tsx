@@ -7,18 +7,18 @@ interface RequireRoleProps {
 }
 
 export const RequireRole: React.FC<RequireRoleProps> = ({ allowedRoles }) => {
-  let userRole = Cookies.get('userRole') as 'broker' | 'receptionist' | 'sales' | 'admin' | 'calling' | 'channel_partner' | undefined;
+  const userRole = Cookies.get('userRole') as 'broker' | 'receptionist' | 'sales' | 'admin' | 'calling' | 'channel_partner' | undefined;
   
-  // Default to admin for prototype preview
-  if (!userRole) {
-    userRole = 'admin';
-    Cookies.set('userRole', 'admin', { expires: 7 });
-  }
-
-  // Admin has access to all prototype screens
-  if (userRole === 'admin' || allowedRoles.includes(userRole)) {
-    return <Outlet />;
+  if (!userRole || !allowedRoles.includes(userRole)) {
+    if (userRole === 'broker') return <Navigate to="/broker/dashboard" replace />;
+    if (userRole === 'receptionist') return <Navigate to="/receptionist/dashboard" replace />;
+    if (userRole === 'sales') return <Navigate to="/sales/dashboard" replace />;
+    if (userRole === 'admin') return <Navigate to="/admin/dashboard" replace />;
+    if (userRole === 'calling') return <Navigate to="/calling/dashboard" replace />;
+    if (userRole === 'channel_partner') return <Navigate to="/channel-partner/dashboard" replace />;
+    
+    return <Navigate to="/login" replace />;
   }
   
-  return <Navigate to="/admin/dashboard" replace />;
+  return <Outlet />;
 };

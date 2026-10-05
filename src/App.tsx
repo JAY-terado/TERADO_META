@@ -3,6 +3,7 @@ import { BrokerConnectProvider } from './context/BrokerConnectContext';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { NotificationDetailPage } from './pages/NotificationDetailPage';
+import { OAuthCallbackPage } from './pages/OAuthCallback';
 
 // Middleware / Guard imports
 import { RequireAuth, RequireRole, RouteGuard } from './middleware';
@@ -80,6 +81,7 @@ import {
   ActionLeadsPage,
   ActionTasksPage,
   RolePermissionsPage,
+  FacebookIntegrationPage,
 } from './admin';
 
 import { Toaster } from 'react-hot-toast';
@@ -92,6 +94,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/v1/meta/oauth/callback" element={<OAuthCallbackPage />} />
+          <Route path="/meta/oauth/callback" element={<OAuthCallbackPage />} />
 
           {/* Authenticated Routes */}
           <Route element={<RequireAuth />}>
@@ -191,6 +195,7 @@ function App() {
                 <Route path="/admin/leads" element={<AdminLeadsPage />} />
                 <Route path="/admin/leads/:id" element={<AdminLeadsPage />} />
                 <Route path="/admin/settings" element={<SettingsPage />} />
+                <Route path="/admin/facebook-integration" element={<FacebookIntegrationPage />} />
                 <Route path="/admin/templates" element={<TemplateSettings />} />
                 <Route path="/admin/commission-plans" element={<CommissionPlansPage />} />
                 <Route path="/admin/permissions" element={<RolePermissionsPage />} />

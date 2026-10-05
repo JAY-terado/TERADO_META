@@ -16,4 +16,5 @@ export * from './pages/BrokerDetail';
 export * from './pages/ActionLeads';
 export * from './pages/ActionTasks';
 export * from './pages/RolePermissions';
+export * from './pages/FacebookIntegration';
 

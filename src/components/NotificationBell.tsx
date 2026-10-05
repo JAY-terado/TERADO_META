@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Bell, Loader2, RotateCw, CheckCheck } from 'lucide-react';
 import Cookies from 'js-cookie';
-import { 
-  getNotifications, 
-  markNotificationAsRead, 
-  markAllNotificationsAsRead, 
-  type NotificationItem 
+import {
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  type NotificationItem
 } from '../pages/api/notifications';
 
 // Helper to extract a clean message string without raw JSON Data payloads
@@ -31,26 +31,26 @@ const playNotificationChime = () => {
     const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
-    
+
     // Play a gentle, subtle double tone chime
     const playTone = (time: number, freq: number, duration: number) => {
       const osc = ctx.createOscillator();
       const gainNode = ctx.createGain();
-      
+
       osc.connect(gainNode);
       gainNode.connect(ctx.destination);
-      
+
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, time);
-      
+
       gainNode.gain.setValueAtTime(0, time);
       gainNode.gain.linearRampToValueAtTime(0.06, time + 0.04); // low, subtle volume
       gainNode.gain.exponentialRampToValueAtTime(0.001, time + duration);
-      
+
       osc.start(time);
       osc.stop(time + duration);
     };
-    
+
     const now = ctx.currentTime;
     playTone(now, 587.33, 0.35); // D5 tone
     playTone(now + 0.12, 880, 0.45); // A5 tone (harmonious fifth)
@@ -73,8 +73,8 @@ const triggerSystemNotification = (title: string, body: string) => {
   }
 };
 
-export const NotificationBell: React.FC<NotificationBellProps> = ({ 
-  badgeColor = 'bg-[#EC3237]' 
+export const NotificationBell: React.FC<NotificationBellProps> = ({
+  badgeColor = 'bg-[#EC3237]'
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -91,15 +91,15 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     notif: NotificationItem;
   } | null>(null);
   const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Track open state using a ref to prevent closure capture in SSE callbacks
   const isOpenRef = useRef(isOpen);
   useEffect(() => {
     isOpenRef.current = isOpen;
   }, [isOpen]);
 
-  const startToastTimerRef = useRef<() => void>(() => {});
-  const pauseToastTimerRef = useRef<() => void>(() => {});
+  const startToastTimerRef = useRef<() => void>(() => { });
+  const pauseToastTimerRef = useRef<() => void>(() => { });
 
   startToastTimerRef.current = () => {
     if (toastTimerRef.current) {
@@ -124,7 +124,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       const res = await getNotifications(1, 10);
       if (res.success && res.data) {
         setNotifications(res.data);
-        
+
         // Count unread count from the backend response isRead flags
         const unreads = res.data.filter(n => !n.isRead).length;
         setUnreadCount(unreads);
@@ -197,7 +197,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       const token = sessionStorage.getItem('token') || localStorage.getItem('token') || Cookies.get('token');
       if (!token) return;
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.215:3004/v1';
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://192.168.1.215:5173/v1';
       const cleanedBase = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
       const sseUrl = `${cleanedBase}/notifications/stream`;
 
@@ -267,7 +267,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
 
     // Request system notification permissions
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
+      Notification.requestPermission().catch(() => { });
     }
 
     return () => {
@@ -286,14 +286,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   const handleToggle = () => {
     const nextOpen = !isOpen;
     setIsOpen(nextOpen);
-    
+
     if (nextOpen) {
       // Dispatch event to close all other dropdowns
       window.dispatchEvent(new CustomEvent('close-dropdowns', { detail: { except: 'notification' } }));
-      
+
       // Request permission on user gesture
       if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {});
+        Notification.requestPermission().catch(() => { });
       }
     }
   };
@@ -334,9 +334,9 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       const date = new Date(dateString);
       const now = new Date();
       const diffMs = now.getTime() - date.getTime();
-      
+
       if (isNaN(date.getTime())) return '';
-      
+
       const diffMins = Math.floor(diffMs / 60000);
       const diffHours = Math.floor(diffMins / 60);
       const diffDays = Math.floor(diffHours / 24);
@@ -345,7 +345,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       if (diffMins < 60) return `${diffMins}m ago`;
       if (diffHours < 24) return `${diffHours}h ago`;
       if (diffDays < 7) return `${diffDays}d ago`;
-      
+
       return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     } catch (e) {
       return '';
@@ -365,11 +365,11 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   // Click single notification
   const handleNotificationClick = async (notif: NotificationItem) => {
     setIsOpen(false);
-    
+
     if (!notif.isRead) {
       try {
         await markNotificationAsRead(notif.id);
-        
+
         // Update local state
         setNotifications(prev =>
           prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n)
@@ -502,9 +502,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                 <button
                   key={notif.id}
                   onClick={() => handleNotificationClick(notif)}
-                  className={`w-full px-4 py-3.5 hover:bg-slate-50/50 active:bg-slate-100/50 flex gap-3 items-start transition duration-150 border-none outline-none text-left cursor-pointer ${
-                    notif.isRead ? 'opacity-85' : 'bg-slate-50/40 font-semibold'
-                  }`}
+                  className={`w-full px-4 py-3.5 hover:bg-slate-50/50 active:bg-slate-100/50 flex gap-3 items-start transition duration-150 border-none outline-none text-left cursor-pointer ${notif.isRead ? 'opacity-85' : 'bg-slate-50/40 font-semibold'
+                    }`}
                 >
                   <div className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 shadow-sm transition ${notif.isRead ? 'bg-transparent' : 'bg-indigo-600'}`} />
                   <div className="flex-1 min-w-0">
@@ -545,7 +544,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
               }
             }
           `}</style>
-          <div 
+          <div
             className="fixed top-4 left-4 right-4 sm:left-auto sm:right-4 z-[99999] w-auto sm:w-full sm:max-w-sm bg-white/95 backdrop-blur-md border border-slate-100 rounded-2xl p-4 flex gap-3.5 items-start cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(15,23,42,0.18)] group"
             style={{
               boxShadow: '0 20px 50px rgba(15,23,42,0.12)',
@@ -565,7 +564,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
             <div className="p-2.5 bg-gradient-to-br from-[#1A56DB] to-[#10B981] rounded-xl text-white shadow-md shadow-blue-500/10 shrink-0 group-hover:scale-105 transition-transform">
               <Bell className="w-4 h-4 animate-bounce" />
             </div>
-            
+
             {/* Content */}
             <div className="flex-1 min-w-0 pr-2 text-left">
               <h4 className="text-xs font-bold text-slate-800 leading-tight">

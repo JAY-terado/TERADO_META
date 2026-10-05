@@ -24,6 +24,7 @@ export const adminNavigation: NavigationItem[] = [
       { name: 'Field Settings', path: '/admin/settings', icon: Settings2 },
       { name: 'Event Templates', path: '/admin/templates', icon: BellRing },
       { name: 'Manage Commission', path: '/admin/commission-plans', icon: Percent },
+      { name: 'Facebook Connect', path: '/admin/facebook-integration', icon: Users },
       { name: 'Permissions', path: '/admin/permissions', icon: ShieldCheck }
     ]
   },

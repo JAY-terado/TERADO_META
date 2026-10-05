@@ -22,11 +22,7 @@ export const requestLoginOtp = async (identifier: string): Promise<LoginOtpRespo
     if (error.response?.data) {
       return error.response.data as LoginOtpResponse;
     }
-    // Prototype fallback
-    return {
-      success: true,
-      message: 'OTP sent successfully to ' + identifier + ' (Demo code: 123456)',
-    };
+    throw error;
   }
 };
 
@@ -150,20 +146,13 @@ export const verifyLoginOtp = async (identifier: string, otp: number): Promise<L
 
     return {
       ...response.data,
-      token: headerToken || response.data?.token || 'terado-admin-mock-token',
+      token: headerToken || response.data?.token,
     };
   } catch (error: any) {
     if (error.response?.data) {
       return error.response.data as LoginVerifyResponse;
     }
-    // Prototype fallback
-    return {
-      success: true,
-      message: 'Identity verified successfully',
-      token: 'terado-admin-demo-jwt-token-meta-2026',
-      refresh_token: 'terado-admin-demo-refresh-token',
-      user: mockAdminUser,
-    };
+    throw error;
   }
 };
 
@@ -183,10 +172,7 @@ export const refreshAccessToken = async (refreshToken: string): Promise<RefreshT
     if (error.response?.data) {
       return error.response.data as RefreshTokenResponse;
     }
-    return {
-      success: true,
-      token: 'terado-admin-demo-refreshed-token',
-    };
+    throw error;
   }
 };
 
