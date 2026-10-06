@@ -12,9 +12,11 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: true,
+      port: Number(env.PORT || env.VITE_PORT) || 5173,
       allowedHosts: ['app.shreenathhomes.com']
     },
     preview: {
+      port: Number(env.PORT || env.VITE_PORT) || 5173,
       allowedHosts: ['app.shreenathhomes.com']
     },
     define: {
