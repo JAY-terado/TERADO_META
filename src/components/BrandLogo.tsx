@@ -40,8 +40,8 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       {/* Brand Icon Mark with subtle glow & border */}
       <div className="relative shrink-0 flex items-center justify-center">
         <div
-          className={`absolute -inset-0.5 rounded-xl opacity-20 blur-xs transition-opacity duration-300 ${
-            isDark ? 'bg-gradient-to-r from-[#1062AC] to-[#EC3237]' : 'bg-[#1062AC]'
+          className={`absolute -inset-0.5 rounded-xl opacity-25 blur-xs transition-opacity duration-300 ${
+            isDark ? 'bg-gradient-to-r from-[#2982A3] to-[#38A3F8]' : 'bg-[#2982A3]'
           }`}
         />
         <img
@@ -63,9 +63,6 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
               }`}
             >
               Terado<span className="text-[#38A3F8]">CRM</span>
-            </span>
-            <span className="ml-1.5 px-1 py-0.2 bg-[#EC3237]/15 border border-[#EC3237]/30 text-[#EC3237] text-[7.5px] font-extrabold uppercase tracking-wider rounded">
-              PRO
             </span>
           </div>
           {subtitle && (

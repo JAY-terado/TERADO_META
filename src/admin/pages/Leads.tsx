@@ -281,7 +281,24 @@ export const LeadsPage: React.FC = () => {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Check if saved contains legacy test leads that need updating
+            const hasLegacyTestLeads = parsed.some((l: any) => {
+              const name = (l.customer_detail?.customer_name || l.customer_detail?.full_name || '').toLowerCase();
+              const email = (l.customer_detail?.email || '').toLowerCase();
+              const note = (l.customer_detail?.note || '').toLowerCase();
+              return name.includes('test') || email.includes('test@') || note.includes('testing') || name === 'soham 2' || name === 'soham full info';
+            });
+            if (hasLegacyTestLeads) {
+              const updated = parsed.map((l: any) => {
+                const cleanLead = initialAdminDummyLeads.find((init) => init.id === l.id);
+                return cleanLead || l;
+              });
+              localStorage.setItem('admin_dummy_leads_store', JSON.stringify(updated));
+              return updated;
+            }
+            return parsed;
+          }
         } catch {}
       }
     }
