@@ -15,7 +15,19 @@ import {
 // ============================================================================
 // Base URL & Environment Configuration
 // ============================================================================
-const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.teradocrm.com/v1";
+export const getActiveApiBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    const custom = localStorage.getItem("terado_api_base_url");
+    if (custom) return custom;
+  }
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl && !envUrl.includes("localhost:3004")) {
+    return envUrl;
+  }
+  return "http://192.168.100.5:8000/v1";
+};
+
+const baseUrl = getActiveApiBaseUrl();
 
 // Toggle mock mode: active only in prototype mode
 const USE_MOCK_API = process.env.NEXT_PUBLIC_ENVIROMENT === "PROTOTYPE";
@@ -293,7 +305,12 @@ const handleMockRequest = async (config: any): Promise<AxiosResponse | null> => 
 // ============================================================================
 axiosClient.defaults.adapter = async (config) => {
   const url = (config.url || "").toLowerCase();
-  const isAuthRequest = url.includes("/auth/login") || url.includes("/auth/logout");
+  // Endpoints that MUST ALWAYS hit the live backend API directly (never mock)
+  const isBypassMock =
+    url.includes("/auth/login") ||
+    url.includes("/auth/logout") ||
+    url.includes("/organisation-settings") ||
+    url.includes("/onboarding-field-settings");
 
   const currentToken =
     typeof window !== "undefined"
@@ -303,9 +320,8 @@ axiosClient.defaults.adapter = async (config) => {
     currentToken.includes("mock") ||
     currentToken === "terado-admin-mock-token";
 
-  // In prototype mode OR when explicit mock token is active, route non-auth endpoints through mock dispatcher
-  // Auth endpoints always hit the live backend API
-  if (!isAuthRequest && (USE_MOCK_API || isMockAdmin)) {
+  // In prototype mode OR when explicit mock token is active, route non-exempt endpoints through mock dispatcher
+  if (!isBypassMock && (USE_MOCK_API || isMockAdmin)) {
     const mockRes = await handleMockRequest(config);
     if (mockRes) return mockRes;
   }
@@ -356,14 +372,47 @@ axiosClient.defaults.adapter = async (config) => {
 };
 
 // ============================================================================
-// Request Interceptor: Attach Authorization Header
+// Helper to retrieve active CSRF token across memory, sessionStorage, and cookies
+export const getActiveCsrfToken = (): string => {
+  if (typeof window === "undefined") return "";
+  const token =
+    (window as any).__csrfToken ||
+    sessionStorage.getItem("csrf_token") ||
+    sessionStorage.getItem("terado_csrf_token") ||
+    Cookies.get("_csrfToken") ||
+    Cookies.get("csrf_token") ||
+    Cookies.get("x-csrf-token") ||
+    "";
+  return token && !token.startsWith("da39c5bb") ? token : "";
+};
+
+// ============================================================================
+// Request Interceptor: Attach Authorization & CSRF Headers
 // ============================================================================
 axiosClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Preserve session cookies across origins (critical for CSRF cookie validation)
+    config.withCredentials = true;
+
     if (typeof window !== "undefined") {
+      const customBase = localStorage.getItem("terado_api_base_url");
+      if (customBase && !config.url?.startsWith("http")) {
+        config.baseURL = customBase;
+      }
+
       const token = sessionStorage.getItem("token") || localStorage.getItem("token") || Cookies.get("token");
       if (token && config.headers) {
         config.headers.Authorization = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+      }
+
+      // Attach CSRF token header for all requests (required for auth/login, register, and mutations)
+      // (Never attach to the public/init endpoint that generates the token)
+      const isInitEndpoint = (config.url || "").includes("/organisation-settings/public/init");
+      if (!isInitEndpoint && config.headers) {
+        const csrfToken = getActiveCsrfToken();
+        if (csrfToken) {
+          config.headers["x-csrf-token"] = csrfToken;
+        }
       }
     }
     return config;

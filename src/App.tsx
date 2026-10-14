@@ -4,6 +4,7 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { NotificationDetailPage } from './pages/NotificationDetailPage';
 import { OAuthCallbackPage } from './pages/OAuthCallback';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
 
 // Middleware / Guard imports
 import { RequireAuth, RequireRole, RouteGuard } from './middleware';
@@ -94,6 +95,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
           <Route path="/v1/meta/oauth/callback" element={<OAuthCallbackPage />} />
           <Route path="/meta/oauth/callback" element={<OAuthCallbackPage />} />
 

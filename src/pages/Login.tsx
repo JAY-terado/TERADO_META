@@ -6,11 +6,20 @@ import Cookies from 'js-cookie';
 import { requestLoginOtp, verifyLoginOtp, fetchAndStoreUserProfile } from './api/login';
 import { LockIllustration } from '../components/ui/LockIllustration';
 import { BrandLogo } from '../components/BrandLogo';
+import { fetchPublicInit } from '../utils/csrf';
 
 export const Login: React.FC = () => {
   const { setCurrentRole } = useBrokerConnect();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // API 1: Fetch Branding & Get CSRF Token on Login Page Mount
+  // GET /v1/organisation-settings/public/init captures _csrfToken cookie & sets up branding
+  useEffect(() => {
+    fetchPublicInit().catch((err) => {
+      console.warn('Initial public branding / CSRF init failed:', err);
+    });
+  }, []);
 
   // Redirect to dashboard if already logged in with active session
   useEffect(() => {
@@ -377,10 +386,17 @@ export const Login: React.FC = () => {
           </div>
         </div>
 
-        <div className="relative z-10 self-start">
+        <div className="relative z-10 flex items-center justify-between w-full pt-2">
           <p className="text-[9px] text-blue-300/60 font-bold tracking-wide">
             © 2026 Terado CRM Systems. All rights reserved.
           </p>
+          <Link
+            to="/privacy-policy"
+            className="text-[10px] text-sky-400 hover:text-sky-300 font-bold tracking-wide transition hover:underline flex items-center gap-1.5"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-sky-400" />
+            <span>Privacy Policy</span>
+          </Link>
         </div>
       </div>
 
@@ -614,7 +630,31 @@ export const Login: React.FC = () => {
                 <span>Partner Registration</span>
               </Link>
             </div>
+
+            {/* Privacy Policy disclaimer */}
+            <div className="pt-2 text-center border-t border-slate-100/60 lg:border-slate-100/60 border-white/5">
+              <p className="text-[11px] lg:text-slate-400 text-white/50 leading-relaxed">
+                By continuing, you agree to our{' '}
+                <Link
+                  to="/privacy-policy"
+                  className="font-bold lg:text-[#1062AC] text-sky-400 hover:underline"
+                >
+                  Privacy Policy
+                </Link>
+              </p>
+            </div>
           </div>
+        </div>
+
+        {/* Mobile footer links */}
+        <div className="mt-4 flex lg:hidden items-center justify-between w-full max-w-[460px] px-3 text-[10px] text-white/50 font-medium z-10">
+          <span>© 2026 Terado CRM</span>
+          <Link
+            to="/privacy-policy"
+            className="text-sky-400 hover:underline font-bold"
+          >
+            Privacy Policy
+          </Link>
         </div>
       </div>
     </div>

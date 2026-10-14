@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { SlidersHorizontal, Plus, Trash2, Building2, Users, UserCheck, Check, Save, Calendar, ChevronDown, CircleDot, Type, List, Loader2, Pencil, LockKeyhole, Search } from 'lucide-react';
+import { SlidersHorizontal, Plus, Trash2, Building2, Users, UserCheck, Check, Save, Calendar, ChevronDown, CircleDot, Type, List, Loader2, Pencil, LockKeyhole, Search, ShieldCheck } from 'lucide-react';
 import { SearchableSelect } from '../../ui/SearchableSelect';
 import { createMaster, getMasters, updateMasterStatus, bulkUpdateMasters } from '../../../admin/api/masters';
 import type { BulkUpdateRecord } from '../../../admin/api/masters';
 import Swal from 'sweetalert2';
+import { OnboardingFieldSettings } from './OnboardingFieldSettings';
 
 
 const mapApiTypeToUiType = (apiType: string | undefined): 'dropdown' | 'multiselect' | 'radio' | 'date' | 'text' | 'checkbox' | 'date-range' | 'input' | 'number' | 'hyperlink' => {
@@ -392,7 +393,7 @@ const getFieldIdFromCategoryName = (name: string): string | null => {
 };
 
 export const Customization: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'project' | 'broker' | 'receptionist'>('project');
+  const [activeSubTab, setActiveSubTab] = useState<'project' | 'broker' | 'receptionist' | 'onboarding'>('onboarding');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
@@ -406,7 +407,11 @@ export const Customization: React.FC = () => {
 
   useEffect(() => {
     if (showAddFieldModal) {
-      setNewFieldTab(activeSubTab);
+      if (activeSubTab !== 'onboarding') {
+        setNewFieldTab(activeSubTab);
+      } else {
+        setNewFieldTab('project');
+      }
     }
   }, [showAddFieldModal, activeSubTab]);
 
@@ -818,6 +823,17 @@ export const Customization: React.FC = () => {
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 border-b border-slate-200/60 bg-white px-6 py-3 rounded-2xl border border-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.02)] anim-fade-up stagger-1 w-full">
         <div className="flex flex-wrap gap-2">
           <button
+            onClick={() => setActiveSubTab('onboarding')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition cursor-pointer ${
+              activeSubTab === 'onboarding'
+                ? 'bg-blue-50 text-blue-600 shadow-sm border border-blue-100'
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700 border border-transparent'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Onboarding Fields Settings</span>
+          </button>
+          <button
             onClick={() => setActiveSubTab('project')}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition cursor-pointer ${
               activeSubTab === 'project'
@@ -852,62 +868,69 @@ export const Customization: React.FC = () => {
           </button>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative w-full xl:w-72 flex-shrink-0">
-          <span className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-slate-400">
-            <Search className="w-4 h-4" />
-          </span>
-          <input
-            type="text"
-            placeholder="Search fields or options..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl text-xs font-semibold placeholder:text-slate-400 text-slate-800 transition-all focus:outline-none shadow-xs"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute inset-y-0 right-3 flex items-center text-slate-405 hover:text-rose-500 text-xs font-bold transition-colors cursor-pointer"
-              title="Clear search"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Grid of Customization Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 anim-fade-up stagger-2">
-        {activeFields.length === 0 ? (
-          <div className="col-span-2 bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-12 text-center text-slate-400 font-semibold text-sm">
-            {searchQuery.trim()
-              ? `No fields match your search query "${searchQuery}"`
-              : 'No fields configured for this category. Click "Add Custom Field" to create one.'
-            }
-          </div>
-        ) : (
-          activeFields.map((field) => (
-            <MasterFieldCard
-              key={field.id}
-              field={field}
-              fieldTitle={field.title}
-              onAddOption={(opt, dbId) => handleAddOption(field.id, opt, dbId)}
-              onRemoveOption={(idx) => handleRemoveOption(field.id, idx)}
-              onRemoveField={() => handleRemoveField(field)}
-              onEditClick={() => setEditingField(field)}
-              tabName={
-                activeSubTab === 'project'
-                  ? 'Property'
-                  : activeSubTab === 'broker'
-                  ? 'Broker'
-                  : 'Receptionist'
-              }
-              fieldType={field.type}
+        {/* Search Bar (hidden on onboarding tab as onboarding has its own toolbar) */}
+        {activeSubTab !== 'onboarding' && (
+          <div className="relative w-full xl:w-72 flex-shrink-0">
+            <span className="absolute inset-y-0 left-3.5 flex items-center pointer-events-none text-slate-400">
+              <Search className="w-4 h-4" />
+            </span>
+            <input
+              type="text"
+              placeholder="Search fields or options..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200 focus:border-blue-500 focus:bg-white rounded-xl text-xs font-semibold placeholder:text-slate-400 text-slate-800 transition-all focus:outline-none shadow-xs"
             />
-          ))
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-3 flex items-center text-slate-405 hover:text-rose-500 text-xs font-bold transition-colors cursor-pointer"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Main Content Area */}
+      {activeSubTab === 'onboarding' ? (
+        <OnboardingFieldSettings />
+      ) : (
+        /* Grid of Customization Cards */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 anim-fade-up stagger-2">
+          {activeFields.length === 0 ? (
+            <div className="col-span-2 bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-12 text-center text-slate-400 font-semibold text-sm">
+              {searchQuery.trim()
+                ? `No fields match your search query "${searchQuery}"`
+                : 'No fields configured for this category. Click "Add Custom Field" to create one.'
+              }
+            </div>
+          ) : (
+            activeFields.map((field) => (
+              <MasterFieldCard
+                key={field.id}
+                field={field}
+                fieldTitle={field.title}
+                onAddOption={(opt, dbId) => handleAddOption(field.id, opt, dbId)}
+                onRemoveOption={(idx) => handleRemoveOption(field.id, idx)}
+                onRemoveField={() => handleRemoveField(field)}
+                onEditClick={() => setEditingField(field)}
+                tabName={
+                  activeSubTab === 'project'
+                    ? 'Property'
+                    : activeSubTab === 'broker'
+                    ? 'Broker'
+                    : 'Receptionist'
+                }
+                fieldType={field.type}
+              />
+            ))
+          )}
+        </div>
+      )}
 
       {/* Add Custom Field Modal */}
       {showAddFieldModal && (

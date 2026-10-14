@@ -1,4 +1,5 @@
 import axiosClient from '../../../axiosinstance';
+import { ensureCsrfToken } from '../../utils/csrf';
 
 export interface OtpResponse {
   success: boolean;
@@ -7,6 +8,7 @@ export interface OtpResponse {
 
 export const requestEmailOtp = async (email: string): Promise<OtpResponse> => {
   try {
+    await ensureCsrfToken();
     const response = await axiosClient.post('/auth/request-otp', { email });
     return response.data;
   } catch (error: any) {
@@ -19,6 +21,7 @@ export const requestEmailOtp = async (email: string): Promise<OtpResponse> => {
 
 export const verifyEmailOtp = async (email: string, otp: number): Promise<OtpResponse> => {
   try {
+    await ensureCsrfToken();
     const response = await axiosClient.post('/auth/verify-otp', { email, otp });
     return response.data;
   } catch (error: any) {
@@ -53,6 +56,7 @@ export interface RegisterBrokerResponse {
 
 export const registerBroker = async (payload: RegisterBrokerPayload): Promise<RegisterBrokerResponse> => {
   try {
+    await ensureCsrfToken();
     const response = await axiosClient.post('/auth/register', payload);
     return response.data;
   } catch (error: any) {
@@ -71,6 +75,7 @@ export {
 
 export const requestMobileOtp = async (mobileNumber: string): Promise<OtpResponse> => {
   try {
+    await ensureCsrfToken();
     const response = await axiosClient.post('/auth/request-otp', { mobile_number: mobileNumber });
     return response.data;
   } catch (error: any) {
@@ -83,6 +88,7 @@ export const requestMobileOtp = async (mobileNumber: string): Promise<OtpRespons
 
 export const verifyMobileOtp = async (mobileNumber: string, otp: string | number): Promise<OtpResponse> => {
   try {
+    await ensureCsrfToken();
     const response = await axiosClient.post('/auth/verify-otp', { mobile_number: mobileNumber, otp: String(otp) });
     return response.data;
   } catch (error: any) {

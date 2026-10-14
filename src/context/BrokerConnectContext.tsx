@@ -348,7 +348,11 @@ export const BrokerConnectProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   useEffect(() => {
-    const isAuthPage = location.pathname === '/login' || location.pathname === '/register';
+    const isAuthPage =
+      location.pathname === '/login' ||
+      location.pathname === '/register' ||
+      location.pathname === '/privacy-policy' ||
+      location.pathname === '/privacy';
     const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     if (!isAuthPage && token) {
       fetchProjects();

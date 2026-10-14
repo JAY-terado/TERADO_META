@@ -12,11 +12,15 @@ import { requestEmailOtp, verifyEmailOtp, registerBroker, requestMobileOtp, veri
 import { getStates, getCities } from './api/masters';
 import type { State, City } from './api/masters';
 import { BrandLogo } from '../components/BrandLogo';
+import { getPublicOnboardingFields, OnboardingFieldSetting } from '../admin/api/onboardingFields';
 
 
 export const Register: React.FC = () => {
   const { addBroker } = useBrokerConnect();
   const navigate = useNavigate();
+
+  // Dynamic Onboarding Fields Settings (Fetched via CSRF-protected public API)
+  const [onboardingSettings, setOnboardingSettings] = useState<OnboardingFieldSetting[]>([]);
 
   // Wizard Step State
   const [wizardStep, setWizardStep] = useState(1);
@@ -109,7 +113,20 @@ export const Register: React.FC = () => {
         setLoadingStates(false);
       }
     };
+
+    const fetchOnboardingConfig = async () => {
+      try {
+        const res = await getPublicOnboardingFields('BROKER');
+        if (res.success && res.data) {
+          setOnboardingSettings(res.data);
+        }
+      } catch (err) {
+        console.warn('Failed to load public onboarding fields config:', err);
+      }
+    };
+
     fetchStates();
+    fetchOnboardingConfig();
   }, []);
 
   const handleStateChange = async (selectedStateName: string) => {
@@ -237,8 +254,15 @@ export const Register: React.FC = () => {
   const validateStep2 = () => {
     let isValid = true;
 
-    // PAN Number validation - Optional
-    if (panNumber.trim() !== '') {
+    // Check dynamic settings from public onboarding API
+    const panSetting = onboardingSettings.find(f => f.field_name === 'pan_number');
+    const isPanRequired = panSetting ? (Number(panSetting.is_required) === 1) : false;
+
+    // PAN Number validation
+    if (isPanRequired && !panNumber.trim()) {
+      setPanError('PAN Number is required.');
+      isValid = false;
+    } else if (panNumber.trim() !== '') {
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
       if (!panRegex.test(panNumber)) {
         setPanError('Enter a valid PAN number (e.g. ABCDE1234F).');
@@ -250,8 +274,14 @@ export const Register: React.FC = () => {
       setPanError('');
     }
 
-    // GST Number validation - Optional
-    if (gstNumber.trim() !== '') {
+    const gstSetting = onboardingSettings.find(f => f.field_name === 'gst_number');
+    const isGstRequired = gstSetting ? (Number(gstSetting.is_required) === 1) : false;
+
+    // GST Number validation
+    if (isGstRequired && !gstNumber.trim()) {
+      setGstError('GST Number is required.');
+      isValid = false;
+    } else if (gstNumber.trim() !== '') {
       const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
       if (!gstRegex.test(gstNumber)) {
         setGstError('Enter a valid GST number.');
@@ -263,8 +293,14 @@ export const Register: React.FC = () => {
       setGstError('');
     }
 
-    // RERA Registration Number validation - Optional
-    if (reraNumber.trim() !== '') {
+    const reraSetting = onboardingSettings.find(f => f.field_name === 'rera_registration_number');
+    const isReraRequired = reraSetting ? (Number(reraSetting.is_required) === 1) : false;
+
+    // RERA Registration Number validation
+    if (isReraRequired && !reraNumber.trim()) {
+      setReraError('RERA Registration Number is required.');
+      isValid = false;
+    } else if (reraNumber.trim() !== '') {
       const reraRegex = /^[A-Z0-9\-\/]{5,50}$/;
       if (!reraRegex.test(reraNumber)) {
         setReraError('Enter a valid RERA registration number');
@@ -976,8 +1012,12 @@ export const Register: React.FC = () => {
         </div>
 
         {/* Footer info links */}
-        <div className="text-center text-[10px] text-slate-400 font-semibold tracking-wider uppercase shrink-0 pt-4 border-t border-slate-100">
-          <span>Protected Lead Registry &middot; BrokerConnect Systems v2.0</span>
+        <div className="flex flex-wrap items-center justify-center gap-2 text-center text-[10px] text-slate-400 font-semibold tracking-wider shrink-0 pt-4 border-t border-slate-100">
+          <span>Protected Lead Registry &middot; Terado CRM Systems</span>
+          <span>&middot;</span>
+          <Link to="/privacy-policy" className="text-[#1062AC] hover:underline font-bold">
+            Privacy Policy
+          </Link>
         </div>
       </div>
       {/* Mobile OTP Verification Modal */}

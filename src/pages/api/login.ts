@@ -1,6 +1,7 @@
 import axiosClient from '../../../axiosinstance';
 import Cookies from 'js-cookie';
 import { mockAdminUser } from '../../mock/mockData';
+import { ensureCsrfToken } from '../../utils/csrf';
 
 export interface LoginOtpResponse {
   success: boolean;
@@ -9,6 +10,9 @@ export interface LoginOtpResponse {
 
 export const requestLoginOtp = async (identifier: string): Promise<LoginOtpResponse> => {
   try {
+    // Ensure CSRF token is obtained from GET /organisation-settings/public/init before request
+    await ensureCsrfToken();
+
     const payload: { email?: string; mobile_number?: string } = {};
     if (identifier.includes('@')) {
       payload.email = identifier;
@@ -134,6 +138,9 @@ export interface LoginVerifyResponse {
 
 export const verifyLoginOtp = async (identifier: string, otp: number): Promise<LoginVerifyResponse> => {
   try {
+    // Ensure CSRF token is obtained before request
+    await ensureCsrfToken();
+
     const payload: { email?: string; mobile_number?: string; otp: number } = { otp };
     if (identifier.includes('@')) {
       payload.email = identifier;
